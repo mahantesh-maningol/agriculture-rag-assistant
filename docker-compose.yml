@@ -1,0 +1,12 @@
+services:
+  agriculture-rag:
+    build: .
+    ports:
+      - "8501:8501"
+
+    volumes:
+      # Local Streamlit secrets → container
+      - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml:ro
+
+      # Local FAISS vectorstore → container
+      - ./vectorstore:/app/vectorstore:ro

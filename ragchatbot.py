@@ -1,6 +1,7 @@
 import streamlit as st
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
+from cache.llm_cache import configure_llm_cache
 from guardrails.output_guardrail import create_grounding_guardrail
 from observability.tracer import Tracer
 from utils.extract_tool_context import extract_tool_context
@@ -12,8 +13,10 @@ from tools.search_pdf import create_search_pdf_tool
 from tools.get_weather import get_weather
 
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-tracer = Tracer()
+
 st.header("Agriculture AI Assistant")
+
+configure_llm_cache()
 
 embeddings = OpenAIEmbeddings(
     model="text-embedding-3-small", openai_api_key=OPENAI_API_KEY
@@ -32,19 +35,21 @@ user_question = st.text_input("Type your question here")
 retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 4})
 
 
-search_pdf = create_search_pdf_tool(retriever)
-tools = [search_pdf, get_weather]
-
 # define the LLM and Prompt instructions
 llm = ChatOpenAI(
     model="gpt-4o-mini", temperature=0.3, max_tokens=1000, openai_api_key=OPENAI_API_KEY
 )
+
+search_pdf = create_search_pdf_tool(retriever, llm)
+tools = [search_pdf, get_weather]
 
 input_guardrail = create_input_guardrail(llm)
 grounding_guardrail = create_grounding_guardrail(llm)
 
 agent = create_rag_agent(llm, tools)
 if user_question:
+    # Create a NEW tracer for this request
+    tracer = Tracer()
     with tracer.span("input_guardrail", {"question": user_question}) as span:
         guardrail_result = input_guardrail(user_question)
         span["metadata"]["allowed"] = guardrail_result.allowed
@@ -92,11 +97,11 @@ if user_question:
             # This could be a weather request.
             st.write(final_message.content)
 
-trace = tracer.get_trace()
+    # trace = tracer.get_trace()
 
-print("\n===== AI TRACE =====")
+    # print("\n===== AI TRACE =====")
 
-print(trace)
+    # print(trace)
 
 
 # structured_llm = llm.with_structured_output(RAGResponse)
