@@ -23,3 +23,11 @@ jobs:
 
       - name: Verify AWS identity
         run: aws sts get-caller-identity
+
+      - name: Download knowledge files from S3
+        run: |
+          mkdir -p knowledge
+          aws s3 cp s3://myfirstragchatbot-097083928031-ap-south-1-an/knowledge/ ./knowledge/ --recursive
+
+      - name: List downloaded files
+        run: ls -lh knowledge/
