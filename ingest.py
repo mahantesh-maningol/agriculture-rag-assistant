@@ -7,7 +7,11 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not OPENAI_API_KEY:
+    import streamlit as st
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 KNOWLEDGE_DIR = "knowledge"
 VECTORSTORE_DIR = "vectorstore"
