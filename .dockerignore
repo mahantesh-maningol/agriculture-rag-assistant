@@ -5,7 +5,6 @@ __pycache__/
 *.pyc
 .streamlit/secrets.toml
 
-vectorstore/
 knowledge/*.pdf
 
 .DS_Store

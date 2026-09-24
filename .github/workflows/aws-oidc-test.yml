@@ -47,3 +47,9 @@ jobs:
 
       - name: Verify vectorstore
         run: ls -lh vectorstore/
+
+      - name: Build Docker image
+        run: docker build -t agriculture-rag .
+      
+      - name: List Docker images
+        run: docker images
