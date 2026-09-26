@@ -10,8 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not OPENAI_API_KEY:
-    import streamlit as st
-    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    raise ValueError("OPENAI_API_KEY is not configured")
 
 KNOWLEDGE_DIR = "knowledge"
 VECTORSTORE_DIR = "backend/vectorstore"
