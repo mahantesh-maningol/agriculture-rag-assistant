@@ -1,7 +1,8 @@
 import streamlit as st
 from langchain_core.tools import tool
 
-from guardrails.indirect_injuction_guardrail import detect_indirect_injection
+from backend.guardrails.indirect_injuction_guardrail import detect_indirect_injection
+
 
 
 def format_docs(docs):

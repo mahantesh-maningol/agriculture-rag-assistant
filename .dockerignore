@@ -3,8 +3,11 @@
 .idea/
 __pycache__/
 *.pyc
-.streamlit/secrets.toml
+.streamlit/
+.env
 
 knowledge/*.pdf
-
+frontend/
 .DS_Store
+
+aws-personal-env.sh

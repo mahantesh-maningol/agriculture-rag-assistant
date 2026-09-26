@@ -14,7 +14,7 @@ if not OPENAI_API_KEY:
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 KNOWLEDGE_DIR = "knowledge"
-VECTORSTORE_DIR = "vectorstore"
+VECTORSTORE_DIR = "backend/vectorstore"
 
 
 def load_pdfs_from_knowledge():

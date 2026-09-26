@@ -8,6 +8,7 @@ __pycache__/
 .venv/
 venv/
 env/
+.env
 
 # IDEs
 .idea/
@@ -17,10 +18,11 @@ env/
 .streamlit/secrets.toml
 
 # Local vector stores / generated data
-vectorstore/
+backend/vectorstore/
 faiss_index/
 chroma/
 *.faiss
 *.pkl
 
 knowledge/*.pdf
+aws-personal-env.sh
