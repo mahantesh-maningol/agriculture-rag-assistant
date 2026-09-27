@@ -1,9 +1,7 @@
 name: Build and Push to ECR
 
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -46,6 +44,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Generate vectorstore
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python ingest.py
 
       - name: Move vectorstore

@@ -1,0 +1,114 @@
+name: Knowledge Ingestion and Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: agriculture-rag-assistant
+  S3_BUCKET: myfirstragchatbot-097083928031-ap-south-1-an
+
+jobs:
+  knowledge-ingestion:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configure AWS using GitHub OIDC
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::097083928031:role/GitHubActions-AgricultureRAG
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 3. Download knowledge files from S3
+      - name: Download knowledge files
+        run: |
+          mkdir -p knowledge
+
+          aws s3 cp \
+            s3://${S3_BUCKET}/knowledge/ \
+            ./knowledge/ \
+            --recursive
+
+      # 4. Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 5. Install Python dependencies
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # 6. Generate vectorstore
+      - name: Generate vectorstore
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python ingest.py
+
+      # 7. Verify vectorstore was created
+      - name: Verify vectorstore
+        run: |
+          echo "Checking vectorstore..."
+
+          ls -la backend/vectorstore/
+
+          test -f backend/vectorstore/index.faiss
+          test -f backend/vectorstore/index.pkl
+
+      # 8. Upload vectorstore to S3
+      - name: Upload vectorstore to S3
+        run: |
+          aws s3 cp \
+            backend/vectorstore/ \
+            s3://${S3_BUCKET}/vectorstore/ \
+            --recursive
+
+      # 9. Login to ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 10. Build Docker image
+      - name: Build Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
+            .
+
+      # 11. Tag image as latest
+      - name: Tag Docker image as latest
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag \
+            $REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
+            $REGISTRY/$ECR_REPOSITORY:latest
+
+      # 12. Push SHA image
+      - name: Push Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker push \
+            $REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
+
+      # 13. Push latest image
+      - name: Push latest Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker push \
+            $REGISTRY/$ECR_REPOSITORY:latest
