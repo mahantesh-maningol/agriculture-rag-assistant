@@ -31,7 +31,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/GitHubActions-AgricultureRAG
+          role-to-assume: arn:aws:iam::097083928031:role/GitHubActions-AgricultureRAG
           aws-region: ${{ env.AWS_REGION }}
 
       # 3. Download existing vectorstore
