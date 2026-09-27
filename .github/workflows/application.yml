@@ -1,0 +1,95 @@
+name: Build and Push Application
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "knowledge/**"
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: agriculture-rag-assistant
+  S3_BUCKET: myfirstragchatbot-097083928031-ap-south-1-an
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configure AWS using GitHub OIDC
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/GitHubActions-AgricultureRAG
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 3. Download existing vectorstore
+      - name: Download vectorstore from S3
+        run: |
+          mkdir -p backend/vectorstore
+
+          aws s3 cp \
+            s3://${S3_BUCKET}/vectorstore/ \
+            ./backend/vectorstore/ \
+            --recursive
+
+      # 4. Verify vectorstore exists
+      - name: Verify vectorstore
+        run: |
+          echo "Checking vectorstore..."
+
+          ls -la backend/vectorstore/
+
+          test -f backend/vectorstore/index.faiss
+          test -f backend/vectorstore/index.pkl
+
+      # 5. Login to ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 6. Build Docker image
+      - name: Build Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
+            .
+
+      # 7. Tag image as latest
+      - name: Tag Docker image as latest
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag \
+            $REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
+            $REGISTRY/$ECR_REPOSITORY:latest
+
+      # 8. Push SHA image
+      - name: Push Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker push \
+            $REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
+
+      # 9. Push latest image
+      - name: Push latest Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker push \
+            $REGISTRY/$ECR_REPOSITORY:latest
+
