@@ -9,7 +9,7 @@ router = APIRouter(
 
 rag_service = RAGService()
 
-@router.get("", response_model=ChatResponse)
+@router.post("", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
     try:
         result = rag_service.ask(request.question)
