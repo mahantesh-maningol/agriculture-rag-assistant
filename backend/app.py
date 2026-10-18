@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from backend.controllers.chat_controller import router as chat_router
+from backend.controllers.predict_controller import router as predict_router
+
 
 app = FastAPI(
     title="Agriculture RAG API",
@@ -14,3 +16,4 @@ def health():
     }
 
 app.include_router(chat_router)
+app.include_router(predict_router)

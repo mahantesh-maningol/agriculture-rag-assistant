@@ -1,0 +1,101 @@
+{
+  "Bacterial_Spot": {
+    "cause": "Bacterial infection in warm, wet conditions",
+    "treatment": [
+      "Remove infected leaves immediately",
+      "Avoid overhead watering",
+      "Use copper-based bactericides",
+      "Ensure proper plant spacing for airflow"
+    ]
+  },
+
+  "Early_Blight": {
+    "cause": "Fungal disease (Alternaria solani)",
+    "treatment": [
+      "Remove affected leaves",
+      "Apply fungicides like chlorothalonil or mancozeb",
+      "Practice crop rotation",
+      "Keep foliage dry"
+    ]
+  },
+
+  "Healthy": {
+    "cause": "No disease detected",
+    "treatment": [
+      "Maintain regular watering schedule",
+      "Use balanced fertilizers",
+      "Monitor for early signs of disease",
+      "Ensure good sunlight exposure"
+    ]
+  },
+
+  "Late_Blight": {
+    "cause": "Fungal-like pathogen (Phytophthora infestans)",
+    "treatment": [
+      "Remove and destroy infected plants immediately",
+      "Apply fungicides like metalaxyl or chlorothalonil",
+      "Avoid high humidity and water stagnation",
+      "Use resistant plant varieties"
+    ]
+  },
+
+  "Leaf_Mold": {
+    "cause": "Fungal disease in humid environments",
+    "treatment": [
+      "Improve air circulation",
+      "Reduce humidity levels",
+      "Apply fungicides like copper-based sprays",
+      "Remove infected leaves"
+    ]
+  },
+
+  "Mosaic_Virus": {
+    "cause": "Virus spread by insects (aphids)",
+    "treatment": [
+      "Remove infected plants (no cure)",
+      "Control insect vectors like aphids",
+      "Use resistant varieties",
+      "Disinfect tools regularly"
+    ]
+  },
+
+  "Septoria_Leaf_Spot": {
+    "cause": "Fungal disease",
+    "treatment": [
+      "Remove infected leaves",
+      "Apply fungicides (chlorothalonil)",
+      "Avoid overhead watering",
+      "Practice crop rotation"
+    ]
+  },
+
+  "Spider_Mites_Two_Spotted_Spider_Mite": {
+    "cause": "Pest infestation (mites)",
+    "treatment": [
+      "Spray water to remove mites",
+      "Use neem oil or insecticidal soap",
+      "Introduce natural predators (ladybugs)",
+      "Maintain humidity"
+    ]
+  },
+
+  "Target_Spot": {
+    "cause": "Fungal disease",
+    "treatment": [
+      "Remove infected leaves",
+      "Apply fungicides",
+      "Ensure proper spacing",
+      "Avoid leaf wetness"
+    ]
+  },
+
+  "YellowLeaf_Curl_Virus": {
+    "cause": "Virus spread by whiteflies",
+    "treatment": [
+      "Remove infected plants immediately",
+      "Control whiteflies using insecticides or neem oil",
+      "Use resistant varieties",
+      "Install insect-proof nets"
+    ]
+  }
+}

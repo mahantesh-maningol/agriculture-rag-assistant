@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 
-
 class GuardrailResult(BaseModel):
     allowed: bool = Field(..., description="Indicates if the action is allowed")
     reason: str = Field(

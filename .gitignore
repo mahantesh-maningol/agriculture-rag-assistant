@@ -26,3 +26,5 @@ chroma/
 
 knowledge/*.pdf
 aws-personal-env.sh
+dataset/
+task-definition.json
