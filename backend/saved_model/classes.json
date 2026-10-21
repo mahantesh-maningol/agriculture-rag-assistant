@@ -1,1 +1,18 @@
-{"Bacterial_Spot": 0, "Early_Blight": 1, "Healthy": 2, "Late_Blight": 3, "Leaf_Mold": 4, "Mosaic_Virus": 5, "Septoria_Leaf_Spot": 6, "Spider_Mites_Two_Spotted_Spider_Mite": 7, "Target_Spot": 8, "YellowLeaf_Curl_Virus": 9}
+{
+  "Bacterial_spot": 0,
+  "Early_blight": 1,
+  "Healthy": 2,
+  "Jassids_and_mites": 3,
+  "Late_blight": 4,
+  "Leaf_Mold": 5,
+  "Leaf_miner": 6,
+  "Mites": 7,
+  "Nitrogen_Potassium_deficiency": 8,
+  "Nitrogen_deficiency": 9,
+  "Potassium_deficiency": 10,
+  "Septoria_leaf_spot": 11,
+  "Spider_mites": 12,
+  "Target_Spot": 13,
+  "Tomato_Yellow_Leaf_Curl_Virus": 14,
+  "Tomato_mosaic_virus": 15
+}

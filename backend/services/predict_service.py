@@ -3,22 +3,21 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
-from PIL import Image
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 BASE_DIR = Path(__file__).resolve().parent          # backend/services
-MODEL_PATH = BASE_DIR.parent / "saved_model" / "model.h5"
+MODEL_PATH = BASE_DIR.parent / "saved_model" / "model.keras"
 CLASSES_PATH = BASE_DIR.parent / "saved_model" / "classes.json"
-TREATMENT_PATH = BASE_DIR / "treatment.json"
 
 IMG_SIZE = (224, 224)
-CONFIDENCE_THRESHOLD = 70.0
+CONFIDENCE_THRESHOLD = 70.0   # keep equal to MINIMUM_CONFIDENCE * 100 in product_recommendation_tool.py
+TOP_K = 3
 
-DEFAULT_TREATMENT = {"cause": "Unknown", "treatment": ["Consult agricultural expert"]}
+# Class names that are pests rather than diseases (everything with "deficiency"
+# in its name is a nutrient problem, "Healthy" is healthy, the rest are diseases)
+PEST_CLASSES = {"Spider_mites", "Mites", "Leaf_miner", "Jassids_and_mites"}
 
 # ---- Load static assets once at import ----
-with open(TREATMENT_PATH, "r") as f:
-    TREATMENT_MAP = json.load(f)
-
 with open(CLASSES_PATH, "r") as f:
     class_indices = json.load(f)                    # {"ClassName": index}
 
@@ -27,11 +26,39 @@ CLASS_NAMES = [name for name, _ in sorted(class_indices.items(), key=lambda kv: 
 
 model = tf.keras.models.load_model(MODEL_PATH)
 
+# Take the input size from the model itself, so it always matches train.py
+IMG_SIZE = tuple(model.input_shape[1:3])
+
+# Fail loudly at startup if model and classes.json come from different training runs
+assert model.output_shape[-1] == len(CLASS_NAMES), (
+    f"Model has {model.output_shape[-1]} outputs but classes.json has {len(CLASS_NAMES)} classes"
+)
+
+
+def _category(class_name: str) -> str:
+    if class_name == "Healthy":
+        return "Healthy"
+    if "deficiency" in class_name.lower():
+        return "Nutrient deficiency"
+    if class_name in PEST_CLASSES:
+        return "Pest damage"
+    return "Disease"
+
 
 def _preprocess(source) -> np.ndarray:
-    """source: file path or file-like object."""
-    img = Image.open(source).convert("RGB").resize(IMG_SIZE)
-    arr = np.asarray(img, dtype=np.float32) / 255.0   # must match training preprocessing
+    """source: file path or file-like object.
+
+    The model contains its own Rescaling layer, so we pass RAW 0-255 pixels here.
+    Do NOT divide by 255, that would be applied twice.
+    """
+    try:
+        img = Image.open(source)
+        img = ImageOps.exif_transpose(img).convert("RGB")   # fixes rotated phone photos
+    except (UnidentifiedImageError, OSError) as e:
+        raise ValueError("Uploaded file is not a valid image") from e
+
+    arr = np.asarray(img, dtype=np.float32)
+    arr = tf.image.resize(arr, IMG_SIZE).numpy()             # same resize op used in training
     return np.expand_dims(arr, axis=0)
 
 
@@ -42,22 +69,31 @@ def predict_image(source) -> dict:
     idx = int(np.argmax(preds))
     confidence = round(float(preds[idx]) * 100, 2)
 
+    top_predictions = [
+        {
+            "label": CLASS_NAMES[i],
+            "category": _category(CLASS_NAMES[i]),
+            "confidence": round(float(preds[i]) * 100, 2),
+        }
+        for i in np.argsort(preds)[::-1][:TOP_K]
+    ]
+
     if confidence < CONFIDENCE_THRESHOLD:
         return {
             "disease": "Unknown",
+            "category": "Unknown",
             "confidence": confidence,
-            "cause": None,
-            "treatment": None,
+            "message": "Low confidence. Please upload a clear, close-up photo of a single leaf.",
+            "top_predictions": top_predictions,
         }
 
     predicted_class = CLASS_NAMES[idx]
-    info = TREATMENT_MAP.get(predicted_class, DEFAULT_TREATMENT)
 
     return {
-        "disease": predicted_class,
+        "disease": predicted_class,            # key kept so existing API consumers still work
+        "category": _category(predicted_class),
         "confidence": confidence,
-        "cause": info["cause"],
-        "treatment": info["treatment"],
+        "top_predictions": top_predictions,
     }
 
 

@@ -4,16 +4,16 @@ from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
-from backend.cache.llm_cache import configure_llm_cache
-from backend.guardrails.output_guardrail import create_grounding_guardrail
 from backend.guardrails.input_guardrail import create_input_guardrail
-from backend.observability.tracer import Tracer
-from backend.utils.extract_tool_context import extract_tool_context
 
 from backend.agents.agent1 import create_rag_agent
 from backend.tools.search_pdf import create_search_pdf_tool
 from backend.tools.get_weather import get_weather
 from pathlib import Path
+from backend.tools.product_recommendation_tool import (
+    recommend_tomato_products,
+)
+from backend.tools.leaf_analysis_tool import analyze_leaf_image
 
 load_dotenv()
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -27,8 +27,6 @@ class RAGService:
         if not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY is not configured")
 
-        # Configure LLM cache
-        configure_llm_cache()
 
         # Embeddings
         self.embeddings = OpenAIEmbeddings(
@@ -66,11 +64,12 @@ class RAGService:
         self.tools = [
             self.search_pdf,
             get_weather,
+            recommend_tomato_products,
+            analyze_leaf_image
         ]
 
         # Guardrails
         self.input_guardrail = create_input_guardrail(self.llm)
-        self.grounding_guardrail = create_grounding_guardrail(self.llm)
 
         # Agent
         self.agent = create_rag_agent(
@@ -78,22 +77,10 @@ class RAGService:
             self.tools,
         )
 
-    def ask(self, user_question: str):
-
-        # Create a new tracer for every request
-        tracer = Tracer()
-
-        # Input guardrail
-        with tracer.span(
-            "input_guardrail",
-            {"question": user_question},
-        ) as span:
-
-            guardrail_result = self.input_guardrail(user_question)
-
-            span["metadata"]["allowed"] = guardrail_result.allowed
-            span["metadata"]["reason"] = guardrail_result.reason
-
+    def ask(self, user_question: str, context: str | None = None):
+        # The guardrail only sees what the user actually typed.
+        # `context` (e.g. a leaf image analysis) is added for the agent afterwards.
+        guardrail_result = self.input_guardrail(user_question)
         if not guardrail_result.allowed:
             return {
                 "success": False,
@@ -101,67 +88,22 @@ class RAGService:
                 "reason": guardrail_result.reason,
             }
 
-        # Agent
-        with tracer.span(
-            "agent",
-            {"question": user_question},
-        ) as span:
-
-            result = self.agent.invoke(
-                {
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": user_question,
-                        }
-                    ],
-                }
-            )
+        result = self.agent.invoke(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": (
+                            f"{user_question}\n\n{context}" if context else user_question
+                        ),
+                    }
+                ],
+            }
+        )
 
         messages = result["messages"]
 
         final_message = messages[-1]
-
-        # Extract context retrieved by tools
-        context = extract_tool_context(messages)
-
-        if context:
-
-            with tracer.span(
-                "grounding_guardrail",
-                {
-                    "question": user_question,
-                    "context": context,
-                },
-            ) as span:
-
-                grounding_result = self.grounding_guardrail(
-                    user_question,
-                    context,
-                    final_message.content,
-                )
-
-                span["metadata"]["grounded"] = grounding_result.grounded
-                span["metadata"]["reason"] = grounding_result.reason
-
-            if grounding_result.grounded:
-                return {
-                    "success": True,
-                    "answer": final_message.content,
-                }
-
-            return {
-                "success": False,
-                "answer": (
-                    "I couldn't provide that answer because "
-                    "the information could not be verified "
-                    "against the agriculture knowledge base."
-                ),
-                "reason": grounding_result.reason,
-            }
-
-        # No search_pdf was used.
-        # This can be a weather request.
         return {
             "success": True,
             "answer": final_message.content,
