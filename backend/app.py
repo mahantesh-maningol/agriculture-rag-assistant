@@ -2,7 +2,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import asynccontextmanager
 from backend.controllers.chat_controller import router as chat_router
 from backend.controllers.predict_controller import router as predict_router
+import logging
 
+logging.basicConfig(level=logging.INFO)
 from backend.database import (
     open_database_pool,
     close_database_pool,

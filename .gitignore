@@ -18,13 +18,15 @@ env/
 .streamlit/secrets.toml
 
 # Local vector stores / generated data
-backend/vectorstore/
+# backend/vectorstore/
 faiss_index/
 chroma/
-*.faiss
-*.pkl
+# *.faiss
+# *.pkl
 
 knowledge/*.pdf
 aws-personal-env.sh
 dataset/
 task-definition.json
+.DS_Store
+**/.DS_Store

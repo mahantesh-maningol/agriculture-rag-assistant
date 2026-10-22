@@ -1,184 +1,240 @@
-import json
 import os
+import uuid
+from typing import Any
 
 import requests
 import streamlit as st
 
-
-# You can override this with BACKEND_URL in your environment.
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
-CHAT_URL = f"{BACKEND_URL}/chat"
-IMAGE_CHAT_URL = f"{BACKEND_URL}/chat/image"
+API_BASE_URL = os.getenv("RAG_API_URL", "http://localhost:8000").rstrip("/")
+CHAT_URL = f"{API_BASE_URL}/chat"
+IMAGE_CHAT_URL = f"{API_BASE_URL}/chat/image"
 ALLOWED_IMAGE_TYPES = ["jpg", "jpeg", "png", "webp"]
 REQUEST_TIMEOUT_SECONDS = 120
-
 
 st.set_page_config(
     page_title="Agriculture AI Assistant",
     page_icon="🌱",
     layout="centered",
+    initial_sidebar_state="expanded",
 )
 
-st.title("🌱 Agriculture AI Assistant")
-st.caption(
-    "Ask crop-related questions or upload a leaf image for analysis and "
-    "context-aware recommendations."
+# Small amount of CSS to make the app feel closer to a chat product without
+# depending on custom Streamlit components.
+st.markdown(
+    """
+    <style>
+      .block-container { max-width: 920px; padding-top: 1.4rem; padding-bottom: 7rem; }
+      [data-testid="stChatMessage"] { padding: 0.35rem 0; }
+      .app-subtitle { color: var(--text-color); opacity: 0.72; margin-top: -0.5rem; }
+      [data-testid="stSidebar"] { border-right: 1px solid rgba(128,128,128,.18); }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-with st.form("agriculture_chat_form", clear_on_submit=False):
-    user_question = st.text_input(
-        "Your question",
-        placeholder="e.g. What is wrong with this leaf, and how can I manage it?",
-        help="You can ask a text-only question or include an image below.",
-    )
 
-    uploaded_image = st.file_uploader(
-        "Upload a crop leaf image (optional)",
-        type=ALLOWED_IMAGE_TYPES,
-        accept_multiple_files=False,
-        help="Supported formats: JPG, JPEG, PNG and WEBP.",
-    )
-
-    if uploaded_image is not None:
-        st.image(
-            uploaded_image,
-            caption=f"Selected image: {uploaded_image.name}",
-            use_container_width=True,
-        )
-
-    submitted = st.form_submit_button(
-        "Analyze image" if uploaded_image is not None else "Send question",
-        type="primary",
-        use_container_width=True,
-    )
+def new_conversation() -> None:
+    st.session_state.conversation_id = uuid.uuid4().hex
+    st.session_state.messages = []
 
 
-def show_analysis(analysis):
-    """Render prediction details without assuming a particular response schema."""
-    if not analysis:
+def init_state() -> None:
+    if "conversation_id" not in st.session_state:
+        new_conversation()
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+
+def show_analysis(analysis: dict[str, Any] | None) -> None:
+    if not isinstance(analysis, dict):
         return
 
-    st.subheader("Leaf analysis")
+    disease = analysis.get("disease") or analysis.get("label") or "Not available"
+    category = analysis.get("category") or "Not available"
+    confidence = analysis.get("confidence")
+    recommendation = analysis.get("recommendation") or {}
+    products = recommendation.get("products") or []
 
-    # PredictionResponse may be a dictionary, list, or another JSON-compatible
-    # structure. Display structured output safely without assuming field names.
-    if isinstance(analysis, dict):
-        # Display common prediction fields prominently when present.
-        preferred_fields = [
-            "predicted_class",
-            "class_name",
-            "disease",
-            "label",
-            "confidence",
-            "confidence_score",
-        ]
-        displayed = set()
+    with st.expander("Leaf analysis details", expanded=False):
+        col1, col2 = st.columns(2)
+        col1.metric("Model prediction", str(disease))
+        col2.metric(
+            "Model confidence",
+            f"{confidence}%" if confidence is not None else "Not available",
+        )
+        st.caption(f"Category: {category}")
+        if recommendation.get("message"):
+            st.info(recommendation["message"])
+        if products:
+            st.markdown("**Catalogue matches**")
+            for product in products:
+                st.markdown(f"**{product.get('name', 'Unnamed product')}**")
+                if product.get("brand"):
+                    st.caption(str(product["brand"]))
+                if product.get("description"):
+                    st.write(product["description"])
+                details = []
+                for field, label in (
+                    ("application_rate", "Rate"),
+                    ("rate_unit", "Rate unit"),
+                    ("application_method", "Method"),
+                    ("dosage_basis", "Dosage basis"),
+                    ("water_volume_l_per_acre", "Water volume (L/acre)"),
+                ):
+                    value = product.get(field)
+                    if value not in (None, ""):
+                        details.append(f"**{label}:** {value}")
+                if details:
+                    st.markdown("  \n".join(details))
+                st.divider()
+        elif recommendation:
+            st.caption("No verified product cards were returned for this analysis.")
 
-        for field in preferred_fields:
-            if field in analysis and analysis[field] is not None:
-                value = analysis[field]
-                st.write(f"**{field.replace('_', ' ').title()}:** {value}")
-                displayed.add(field)
 
-        remaining = {
-            key: value
-            for key, value in analysis.items()
-            if key not in displayed
-        }
-        if remaining:
-            with st.expander("Full prediction and product details"):
-                st.json(remaining)
-    else:
-        with st.expander("Full prediction details", expanded=True):
-            st.json(analysis)
+def render_message(message: dict[str, Any]) -> None:
+    role = message.get("role", "assistant")
+    with st.chat_message("user" if role == "user" else "assistant"):
+        if message.get("image_bytes"):
+            st.image(message["image_bytes"], caption=message.get("image_name", "Uploaded leaf image"), width=320)
+        if message.get("content"):
+            st.markdown(message["content"])
+        if role != "user":
+            show_analysis(message.get("analysis"))
 
+
+def call_text_chat(question: str) -> dict[str, Any]:
+    response = requests.post(
+        CHAT_URL,
+        params={"conversation_id": st.session_state.conversation_id},
+        json={"question": question},
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def call_image_chat(question: str, uploaded_file: Any) -> dict[str, Any]:
+    uploaded_file.seek(0)
+    response = requests.post(
+        IMAGE_CHAT_URL,
+        data={
+            "question": question,
+            "conversation_id": st.session_state.conversation_id,
+        },
+        files={
+            "file": (
+                uploaded_file.name,
+                uploaded_file.getvalue(),
+                uploaded_file.type or "application/octet-stream",
+            )
+        },
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+init_state()
+
+with st.sidebar:
+    st.markdown("## 🌱 Agriculture AI")
+    if st.button("＋ New chat", use_container_width=True, type="primary"):
+        new_conversation()
+        st.rerun()
+    st.divider()
+    st.markdown("**Things you can ask**")
+    st.markdown(
+        "- Upload a leaf photo for analysis\n"
+        "- Ask about a detected condition\n"
+        "- Ask about a product's label or application rate\n"
+        "- Ask for a weather forecast or spray window\n"
+        "- Ask questions from the agriculture knowledge base"
+    )
+    st.divider()
+    st.caption("Conversation history is kept by this browser session and the running API process. It is not durable storage yet.")
+
+st.title("🌱 Agriculture AI Assistant")
+st.markdown(
+    '<p class="app-subtitle">Ask farming questions, analyse a leaf, and continue with follow-up questions in the same conversation.</p>',
+    unsafe_allow_html=True,
+)
+
+if not st.session_state.messages:
+    st.markdown("### How can I help with your crop today?")
+    st.markdown("You can start with a question or attach a leaf image in the message box below.")
+
+for saved_message in st.session_state.messages:
+    render_message(saved_message)
+
+# Streamlit's native chat input supports attachments in recent Streamlit versions.
+submitted = st.chat_input(
+    "Message Agriculture AI…",
+    accept_file="multiple",
+    file_type=ALLOWED_IMAGE_TYPES,
+)
 
 if submitted:
-    if uploaded_image is None and not user_question.strip():
-        st.warning("Please enter a question or upload a leaf image.")
+    question = (submitted.text or "").strip()
+    files = list(submitted.files or [])
+    image_file = files[0] if files else None
+
+    if len(files) > 1:
+        st.warning("Please attach one leaf image at a time. The first image will be analysed.")
+
+    if not question and image_file is None:
+        st.warning("Type a question or attach a leaf image.")
         st.stop()
 
-    try:
-        with st.spinner(
-            "Analyzing the leaf and preparing recommendations..."
-            if uploaded_image is not None
-            else "Preparing your answer..."
-        ):
-            if uploaded_image is not None:
-                # The controller expects multipart/form-data:
-                # `question` as a form field and `file` as the uploaded image.
-                uploaded_image.seek(0)
-                files = {
-                    "file": (
-                        uploaded_image.name,
-                        uploaded_image.getvalue(),
-                        uploaded_image.type or "application/octet-stream",
-                    )
-                }
-                data = {"question": user_question.strip()}
-
-                response = requests.post(
-                    IMAGE_CHAT_URL,
-                    data=data,
-                    files=files,
-                    timeout=REQUEST_TIMEOUT_SECONDS,
-                )
-            else:
-                # Preserve the existing text-only JSON request.
-                response = requests.post(
-                    CHAT_URL,
-                    json={"question": user_question.strip()},
-                    timeout=REQUEST_TIMEOUT_SECONDS,
-                )
-
-        # Show useful backend validation/error messages where possible.
-        if not response.ok:
-            try:
-                error_body = response.json()
-                detail = error_body.get("detail", error_body)
-            except (ValueError, AttributeError):
-                detail = response.text or response.reason
-
-            st.error(f"Backend returned HTTP {response.status_code}: {detail}")
-            st.stop()
-
-        try:
-            result = response.json()
-        except ValueError:
-            st.error("The backend returned a response that was not valid JSON.")
-            st.stop()
-
-        if result.get("success"):
-            answer = result.get("answer")
-            if answer:
-                st.subheader("Assistant response")
-                st.markdown(answer)
-            else:
-                st.info("The analysis completed, but the assistant returned no text.")
-        else:
-            reason = result.get("reason")
-            answer = result.get("answer")
-            if answer:
-                st.warning(answer)
-            if reason:
-                st.caption(f"Details: {reason}")
-            if not answer and not reason:
-                st.warning("The backend could not complete the request.")
-
-        if uploaded_image is not None:
-            show_analysis(result.get("analysis"))
-
-    except requests.exceptions.Timeout:
-        st.error(
-            "The request timed out. Image analysis can take longer; "
-            "please try again or increase REQUEST_TIMEOUT_SECONDS."
+    if image_file is not None:
+        image_bytes = image_file.getvalue()
+        user_text = question or "Please analyse this leaf and explain what you find."
+        st.session_state.messages.append(
+            {
+                "role": "user",
+                "content": user_text,
+                "image_bytes": image_bytes,
+                "image_name": image_file.name,
+            }
         )
-    except requests.exceptions.ConnectionError:
-        st.error(
-            f"Unable to connect to the backend at {BACKEND_URL}. "
-            "Make sure your FastAPI server is running."
+    else:
+        user_text = question
+        st.session_state.messages.append({"role": "user", "content": user_text})
+
+    try:
+        with st.spinner("Thinking…"):
+            result = (
+                call_image_chat(question, image_file)
+                if image_file is not None
+                else call_text_chat(question)
+            )
+
+        answer = result.get("answer") or "I couldn't generate an answer for this turn."
+        assistant_message = {
+            "role": "assistant",
+            "content": answer,
+            "analysis": result.get("analysis"),
+        }
+        if not result.get("success") and result.get("reason"):
+            assistant_message["content"] += f"\n\n_Request status: {result['reason']}_"
+        st.session_state.messages.append(assistant_message)
+    except requests.exceptions.HTTPError as error:
+        detail = "The API returned an error."
+        try:
+            detail = error.response.json().get("detail", detail)
+        except Exception:
+            pass
+        st.session_state.messages.append(
+            {"role": "assistant", "content": f"I couldn't process that request: {detail}"}
         )
     except requests.exceptions.RequestException as error:
-        st.error(f"Request failed: {error}")
-    except Exception as error:
-        st.error(f"Unexpected error while processing the request: {error}")
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": (
+                    "I couldn't connect to the API. Check that FastAPI is running at "
+                    f"`{API_BASE_URL}`. Details: `{error}`"
+                ),
+            }
+        )
+
+    st.rerun()
