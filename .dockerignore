@@ -7,7 +7,6 @@ __pycache__/
 .env
 
 knowledge/*.pdf
-frontend/
 .DS_Store
 
 aws-personal-env.sh

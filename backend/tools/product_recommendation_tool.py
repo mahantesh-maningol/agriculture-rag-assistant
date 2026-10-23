@@ -58,7 +58,7 @@ PRODUCT_QUERY = """
                 = lower(trim(%s))
       )
     ORDER BY p.name
-    LIMIT 10;
+    LIMIT 2;
 """
 
 

@@ -137,7 +137,7 @@ def call_image_chat(question: str, uploaded_file: Any) -> dict[str, Any]:
 init_state()
 
 with st.sidebar:
-    st.markdown("## 🌱 Agriculture AI")
+    st.markdown("## 🌱 Green Guardian")
     if st.button("＋ New chat", use_container_width=True, type="primary"):
         new_conversation()
         st.rerun()
@@ -153,7 +153,7 @@ with st.sidebar:
     st.divider()
     st.caption("Conversation history is kept by this browser session and the running API process. It is not durable storage yet.")
 
-st.title("🌱 Agriculture AI Assistant")
+st.title("🌱 Green Guardian (Agriculture AI Assistant)")
 st.markdown(
     '<p class="app-subtitle">Ask farming questions, analyse a leaf, and continue with follow-up questions in the same conversation.</p>',
     unsafe_allow_html=True,

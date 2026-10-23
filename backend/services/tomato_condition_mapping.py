@@ -34,16 +34,16 @@ TOMATO_CLASS_MAPPING = {
         "condition": "Mite infestation",
         "category": "pest",
     },
-    "Nitrogen_Potassium_deficiency": {
-        "condition": "Nitrogen and potassium deficiency",
-        "category": "nutrient_deficiency",
-    },
     "Nitrogen_deficiency": {
         "condition": "Nitrogen deficiency",
         "category": "nutrient_deficiency",
     },
-    "Potassium_deficiency": {
+    "Pottassium_deficiency": {
         "condition": "Potassium deficiency",
+        "category": "nutrient_deficiency",
+    },
+    "Magnesium_deficiency": {
+        "condition": "Magnesium deficiency",
         "category": "nutrient_deficiency",
     },
     "Septoria_leaf_spot": {

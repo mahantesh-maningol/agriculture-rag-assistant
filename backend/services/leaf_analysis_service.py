@@ -8,6 +8,7 @@ No LLM is involved here, so the result is deterministic and fast.
 import json
 import logging
 
+from backend.services.leaf_validation_service import validate_leaf_image
 from backend.services.predict_service import CLASS_NAMES, predict_image
 from backend.services.tomato_condition_mapping import TOMATO_CLASS_MAPPING
 from backend.tools.product_recommendation_tool import get_tomato_product_recommendations
@@ -32,6 +33,36 @@ def analyze_leaf(source) -> dict:
     treatment, top_predictions) plus a "recommendation" key, so existing API
     consumers keep working. Raises ValueError if the file is not a valid image.
     """
+
+    # Both validation and prediction may read from the same file stream.
+    if hasattr(source, "seek"):
+        source.seek(0)
+
+    validation = validate_leaf_image(source)
+    print("🚀 ~ analyze_leaf ~ validation:", validation)
+
+    if not validation["valid_leaf"]:
+        message = validation["message"]
+
+        return {
+            "status": "rejected",
+            "disease": None,
+            "category": None,
+            "confidence": None,
+            "message": message,
+            "top_predictions": [],
+            "recommendation": {
+                "success": False,
+                "recommendation_status": "needs_review",
+                "message": message,
+                "products": [],
+            },
+        }
+
+    # Reset the stream because validation has already read it.
+    if hasattr(source, "seek"):
+        source.seek(0)
+    
     prediction = predict_image(source)
 
     top = prediction["top_predictions"]
@@ -58,7 +89,7 @@ def analyze_leaf(source) -> dict:
             "products": [],
         }
 
-    return {**prediction, "recommendation": recommendation}
+    return {**prediction, "status": "success", "recommendation": recommendation}
 
 
 # Only these product fields are shown to the LLM. The full records (image and
@@ -71,6 +102,16 @@ _AGENT_PRODUCT_FIELDS = (
 
 def format_for_agent(analysis: dict) -> str:
     """Turn analyze_leaf() output into a context block for the chat agent."""
+    if analysis.get("status") == "rejected":
+        return (
+            "[LEAF IMAGE ANALYSIS REJECTED]\n"
+            f"{analysis.get('message', 'Please upload a clear leaf photo.')}\n"
+            "[INSTRUCTIONS: Tell the user the image could not be validated "
+            "as a recognizable plant leaf. Ask for a clear, close-up leaf "
+            "photo. Do not diagnose the image or recommend products.]"
+        )
+
+
     rec = analysis["recommendation"]
     payload = {
         "detected": analysis["disease"],

@@ -73,6 +73,7 @@ def create_rag_agent(llm, tools):
     - Reuse a valid analysis result for follow-up questions about the same
     image. Run the model again only when a new image or another analysis
     is genuinely needed.
+    - If the confidence of the prediction is low or uncertain, clearly communicate this to the user and suggest obtaining a clearer image or additional information and dont display any potential diagnoses.
 
     4. recommend_tomato_products
 
